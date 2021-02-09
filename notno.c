@@ -5,23 +5,26 @@
 #include <stdio.h>
 #include <unistd.h>
 
-/* NotNo - Not Nano
+/* NotNo - Not Nano, a text editor
 Felix Bowyer 2020-2021
-todo - improve buffers using custom string to double string size when out of chars
-       add literally any error checking, that would be great */
+*/
 
 // ncurses functions
 
 int createPrompt(WINDOW* inputborder, char* prompt) {
+    // Creates a prompt message within a window border
     box(inputborder, 0, 0);
+    //move cursor to (0,2) to begin writing
     wmove(inputborder, 0, 2);
     if (prompt != "") wprintw(inputborder, "%s", prompt);
     wrefresh(inputborder);
 }
 
 char* getInput(WINDOW* inputwindow, WINDOW* inputborder, char* prompt) {
+    // Gets input from an ncurses window
     createPrompt(inputborder, prompt);
 
+    //enable all keys
     keypad(inputwindow, true);
     char inputchar;
     int charcount = 0;
@@ -37,6 +40,7 @@ char* getInput(WINDOW* inputwindow, WINDOW* inputborder, char* prompt) {
                 charcount--;
             }
         } else {
+            //put character in box
             waddch(inputwindow, inputchar);
             wrefresh(inputwindow);
             charcount++;
@@ -45,6 +49,7 @@ char* getInput(WINDOW* inputwindow, WINDOW* inputborder, char* prompt) {
 
     char* inputstr = (char*)malloc(charcount+1);
 
+    // get characters in box
     mvwinnstr(inputwindow, 0, 0, inputstr, charcount);
     werase(inputwindow);
     createPrompt(inputborder, "");
@@ -54,17 +59,20 @@ char* getInput(WINDOW* inputwindow, WINDOW* inputborder, char* prompt) {
 }
 
 int outputToWin(WINDOW* outputwindow, char* output) {
+    // Output to ncurses window
     werase(outputwindow);
     wprintw(outputwindow, output);
     wrefresh(outputwindow);
 }
 
 int appendOutputToWin(WINDOW* outputwindow, char* output) {
+    // output to ncurses window without erasing
     wprintw(outputwindow, output);
     wrefresh(outputwindow);
 }
 
 int outputCharToWin(WINDOW* outputwindow, char output) {
+    // output single character to ncurses window without erasing
     wprintw(outputwindow, "%c", output);
     wrefresh(outputwindow);
 }
@@ -101,11 +109,13 @@ int copyFile(char* ffrom, char* fto) {
 }
 
 int deleteFile(char* fname) {
-    if (remove(fname) == 0) return 0;
+    // deletes a file
+    if (remove(fname) == 0) return 0; //0 returned on success
     else return 1;
 }
 
 int showFile(WINDOW* outputwindow, char* fname) {
+    //outputs file contents to an ncurses window
     //first clear outputwindow
     outputToWin(outputwindow, "");
 
@@ -113,6 +123,7 @@ int showFile(WINDOW* outputwindow, char* fname) {
     char c;
     fp = fopen(fname, "r");
     while(1){
+        // go thorugh every character and output
         c = fgetc(fp);
         if (c == EOF) break;
         else outputCharToWin(outputwindow, c);
@@ -121,39 +132,44 @@ int showFile(WINDOW* outputwindow, char* fname) {
 }
 
 int appendLine(char* fname, char* line) {
+    //appends a line to the end of a file
     FILE *fp;
-    fp = fopen(fname, "a");
-    fputc('\n', fp);
+    fp = fopen(fname, "a"); //append mode
     int i;
-    for (i=0; i<strlen(line); i++) {
+    fputc('\n', fp);
+    for (i=0; i<strlen(line); i++) { //append each character from line to the end
         fputc(line[i], fp);
     }
     fclose(fp);
-    // this can be improved with fprintf https://stackoverflow.com/questions/30213716/how-to-properly-append-lines-to-already-existing-file
 }
 
 int showLine(char* fname, int lineNo, WINDOW* outputwin, WINDOW* outputborder, char* prompt) {
+    //shows the lineNo th line of a file
     FILE *fp;
     int bufsize = 255;
     char* lineToShow = (char*)malloc(bufsize);
-    fp = fopen(fname, "r");
+    fp = fopen(fname, "r"); //read mode
     int i;
     for (i=0; i<lineNo; i++) {
-        fgets(lineToShow, bufsize, fp);
+        fgets(lineToShow, bufsize, fp); //get every line, up to line wanted to be output
     }
     fclose(fp);
     createPrompt(outputborder, prompt);
-    outputToWin(outputwin, lineToShow);
+    outputToWin(outputwin, lineToShow); //output the line
 }
 
 int countFileLines(char* fname) {
+    // returns an int containing the number of lines in a file, by counting newline characters
     FILE* fp;
     char c;
     int newlines = 1;
     fp = fopen(fname, "r");
+    c = fgetc(fp);
+    if (c == EOF) return 1; //Empty files have 1 line
+    else if (c == '\n') newlines++;
     while (1) {
         c = fgetc(fp);
-        if (c == '\n') newlines++;
+        if (c == '\n') newlines++; //add 1 when newline found
         else if (c == EOF) break;
     }
     fclose(fp);
@@ -182,7 +198,7 @@ int insertLine(char* fname, char* lineToInsert, int lineNo) {
     if (lineNo <= numOfLines) strcat(lineToInsert, "\n"); //i think this is okay, if there are issues there is a problem with the <=, maybe should be <
     fprintf(ftempp, lineToInsert);
     // make sure there is no \n at end of file if inserted at last line
-    for (i=lineNo; i<=numOfLines; i++) { //replace 8 with a function that counts the number of lines in a file pleasde, it will work complet once that is done
+    for (i=lineNo; i<=numOfLines-1; i++) {
         fgets(lineBuffer, sizeof(lineBuffer), ffromp);
         fprintf(ftempp, lineBuffer);
     }
@@ -216,7 +232,7 @@ int deleteLine(char* fname, int lineNo) {
 
     fgets(lineBuffer, sizeof(lineBuffer), ffromp);
 
-    for (i=lineNo; i<=numOfLines; i++) { 
+    for (i=lineNo; i<numOfLines; i++) { //append remaining lines
         fgets(lineBuffer, sizeof(lineBuffer), ffromp);
         fprintf(ftempp, lineBuffer);
     }
@@ -228,6 +244,7 @@ int deleteLine(char* fname, int lineNo) {
 }
 
 int logNumOfLines(FILE* logp, char* fname) {
+    // writes the number of lines in a file to the log pointed to by logp
     int fileLines = countFileLines(fname);
     fprintf(logp, "=> File %s has %i lines\n", fname, fileLines);
 }
@@ -251,7 +268,7 @@ int find(char* searchString, char* fname, WINDOW* outputwindow) {
 
     //check if buffer matches searchString
     if (strncmp(searchString, searchBuffer, bufLength) == 0) {
-        appendOutputToWin(outputwindow, "Found on line 1\n");
+        //appendOutputToWin(outputwindow, "Found on line 1\n");
         numFound++;
     }
 
@@ -331,19 +348,22 @@ int replace(char* searchString, char* replString, char* fname, WINDOW* outputwin
     FILE* tempp = fopen(".temp", "w"); //write to temp file first
     currChar = 0;
     numFound = 0;
-    char c = 'p'; //placeholder
+    char c = 'p'; //placeholder, could be anything but EOF
     while (c != EOF) {
         c = fgetc(fp);
-        if (matchIndices[numFound] == currChar) { //if we are at a position where we need to replace
+        if (matchIndices[numFound] == currChar-1) { //if we are at a position where we need to replace
             fputs(replString, tempp);
             numFound++;
-            for (i=0; i<bufLength; i++) {
+            for (i=0; i<bufLength-1; i++) {
                 fgetc(fp);
                 currChar++;
             }
-        } else {
-            fputc(c, tempp);
             currChar++;
+        } else {
+            if (c != EOF) {
+                fputc(c, tempp);
+                currChar++;
+            }
         }
     }
     fclose(fp);
@@ -352,6 +372,13 @@ int replace(char* searchString, char* replString, char* fname, WINDOW* outputwin
     rename(".temp", fname);
 
     showFile(outputwindow, fname);
+}
+
+int checkFileName(char* fname) {
+    // code saver method, does some checks on filenames to validate user input
+    if (strcmp(fname, "") == 0) return 1; //file name invalid
+    else if (fileExists(fname)) return 2; //file already exists
+    else return 0; //file does not currently exist (or is unreadable)
 }
 
 int main(int argc, char** argv) {
@@ -393,6 +420,7 @@ int main(int argc, char** argv) {
     int highlight = 0;
     char* fname;
     int exit = 0;
+    char confirm;
 
     while (exit == 0) {
         while(1) {
@@ -430,27 +458,62 @@ int main(int argc, char** argv) {
         switch (highlight) {
             case 1: //Create File
                 fname = getInput(inputwin, inputwinborder, "Enter a file name to create:");
-                if (fileExists(fname)) {
-                    char confirm = getInput(inputwin, inputwinborder, "File already exists - continue? [y/N] ")[0];
-                    if (confirm == 'y' || confirm == 'Y') {
-                        createFile(fname);
-                        outputToWin(displaywin, "File successfully created");
-                        fprintf(chlogp, "File %s created\n", fname);
-                    } else outputToWin(displaywin, "File not created");
-                } else {
-                    createFile(fname);
-                    outputToWin(displaywin, "File successfully created");
-                    fprintf(chlogp, "File %s created\n", fname);
-                    logNumOfLines(chlogp, fname);
+
+                //if entered name is just empty string
+                if (checkFileName(fname) == 1) {
+                    outputToWin(displaywin, "Invalid name entered");
+                    break;
+
+                //Check if file already exists to prevent overwrite
+                } else if (checkFileName(fname) == 2) { 
+                    confirm = getInput(inputwin, inputwinborder, "File already exists - continue? [y/N] ")[0];
+                    if (confirm == 'y' || confirm == 'Y') ;
+                    else {
+                        outputToWin(displaywin, "File not created");
+                        break;
+                    }
                 }
+                
+                //File creation
+                createFile(fname);
+                outputToWin(displaywin, "File successfully created");
+                fprintf(chlogp, "File %s created\n", fname);
+                logNumOfLines(chlogp, fname);
                 break;
 
             case 2: //copy file
                 fname = getInput(inputwin, inputwinborder, "Enter a file to copy from:");
-                if (!fileExists(fname)) {
+
+                //if name invalid
+                if (checkFileName(fname) == 1) {
+                    outputToWin(displaywin, "Invalid name entered");
+
+                //if file already exists
+                } else if (checkFileName(fname) == 0) {
                     outputToWin(displaywin, "File does not exist, or is unreadable");
                 } else {
                     char* fnameto = getInput(inputwin, inputwinborder, "Enter a file name to copy to:");
+
+                    //stop file copying to itself
+                    if(strcmp(fname, fnameto) == 0) {
+                        outputToWin(displaywin, "Cannot copy a file to itself");
+                        break;
+                    }
+
+                    //if name invalid
+                    if (checkFileName(fnameto) == 1) {
+                        outputToWin(displaywin, "Invalid name entered");
+                        break;
+                    } else if (checkFileName(fnameto) == 2) {
+                        confirm = getInput(inputwin, inputwinborder, "File already exists - continue? [y/N] ")[0];
+                        if (confirm == 'y' || confirm == 'Y') ;
+                        else {
+                            outputToWin(displaywin, "File not created");
+                            break;
+                        }
+                    }
+
+                    //File copying
                     copyFile(fname, fnameto);
                     fprintf(chlogp, "File %s copied to %s\n", fname, fnameto);
                     outputToWin(displaywin, "File successfully copied");
@@ -461,7 +524,13 @@ int main(int argc, char** argv) {
 
             case 3: //delete file
                 fname = getInput(inputwin, inputwinborder, "Enter a file to delete:");
-                if (deleteFile(fname) == 0) {
+                //if filename invalid
+                if (checkFileName(fname) == 1) {
+                    outputToWin(displaywin, "Invalid name entered");
+                    break;
+
+                //if file successfully deletes
+                } else if (deleteFile(fname) == 0) {
                     fprintf(chlogp, "File %s deleted\n", fname);
                     outputToWin(displaywin, "File successfully deleted");
                 }
@@ -470,6 +539,19 @@ int main(int argc, char** argv) {
             
             case 4: //show file
                 fname = getInput(inputwin, inputwinborder, "Enter a file to show:");
+                
+                //if filename invalid
+                if (checkFileName(fname) == 1) {
+                    outputToWin(displaywin, "Invalid name entered");
+                    break;
+                
+                //if file doesn't exist
+                } else if (checkFileName(fname) == 0) {
+                    outputToWin(displaywin, "File does not exist, or is unreadable");
+                    break;
+                }
+
+                //show the file
                 createPrompt(displaywinborder, fname);
                 fprintf(chlogp, "File %s shown\n", fname);
                 logNumOfLines(chlogp, fname);
@@ -478,6 +560,19 @@ int main(int argc, char** argv) {
 
             case 6: //append line
                 fname = getInput(inputwin, inputwinborder, "Enter a file to append to:");
+
+                //if filename invalid
+                if (checkFileName(fname) == 1) {
+                    outputToWin(displaywin, "Invalid name entered");
+                    break;
+                
+                //if file doesn't exist
+                } else if (checkFileName(fname) == 0) {
+                    outputToWin(displaywin, "File does not exist, or is unreadable");
+                    break;
+                }
+
+                //append the line
                 char* linetoappend = getInput(inputwin, inputwinborder, "Enter a line to append:");
                 appendLine(fname, linetoappend);
                 fprintf(chlogp, "File %s appended to with: %s\n", fname, linetoappend);
@@ -487,8 +582,21 @@ int main(int argc, char** argv) {
 
             case 7: //show line
                 fname = getInput(inputwin, inputwinborder, "Enter a file to show a line from:");
+
+                //if filename invalid
+                if (checkFileName(fname) == 1) {
+                    outputToWin(displaywin, "Invalid name entered");
+                    break;
+                
+                //if file doesn't exist
+                } else if (checkFileName(fname) == 0) {
+                    outputToWin(displaywin, "File does not exist, or is unreadable");
+                    break;
+                }
+
                 char* flineindex = getInput(inputwin, inputwinborder, "Enter the line number to show:");
-                if (atoi(flineindex) == 0) outputToWin(displaywin, "Invalid line number entered");
+
+                if (atoi(flineindex) <= 0 || atoi(flineindex) > countFileLines(fname)) outputToWin(displaywin, "Invalid line number entered");
                 else {
                     showLine(fname, atoi(flineindex), displaywin, displaywinborder, flineindex);
                     fprintf(chlogp, "Line %s shown from file %s\n", flineindex, fname);
@@ -498,9 +606,21 @@ int main(int argc, char** argv) {
 
             case 8: //insert line
                 fname = getInput(inputwin, inputwinborder, "Enter a file to insert a line to:");
+
+                //if filename invalid
+                if (checkFileName(fname) == 1) {
+                    outputToWin(displaywin, "Invalid name entered");
+                    break;
+                
+                //if file doesn't exist
+                } else if (checkFileName(fname) == 0) {
+                    outputToWin(displaywin, "File does not exist, or is unreadable");
+                    break;
+                }
+
                 char* linetoinsert = getInput(inputwin, inputwinborder, "Enter a line to insert:");
                 char* finsindex = getInput(inputwin, inputwinborder, "Enter the line number to insert at:");
-                if (atoi(finsindex) == 0) outputToWin(displaywin, "Invalid line number entered");
+                if (atoi(finsindex) <= 0 || atoi(finsindex) > countFileLines(fname)) outputToWin(displaywin, "Invalid line number entered");
                 else {
                     insertLine(fname, linetoinsert, atoi(finsindex));
                     fprintf(chlogp, "Line \"%s\" inserted into file %s at index %s\n", linetoinsert, fname, finsindex);
@@ -510,8 +630,20 @@ int main(int argc, char** argv) {
 
             case 9: //delete line
                 fname = getInput(inputwin, inputwinborder, "Enter a file to delete a line from:");
+
+                //if filename invalid
+                if (checkFileName(fname) == 1) {
+                    outputToWin(displaywin, "Invalid name entered");
+                    break;
+                
+                //if file doesn't exist
+                } else if (checkFileName(fname) == 0) {
+                    outputToWin(displaywin, "File does not exist, or is unreadablaae");
+                    break;
+                }
+
                 char* fdelindex = getInput(inputwin, inputwinborder, "Enter a line number to delete:");
-                if (atoi(fdelindex) == 0) outputToWin(displaywin, "Invalid line number entered");
+                if (atoi(fdelindex) <= 0 || atoi(fdelindex) > countFileLines(fname)) outputToWin(displaywin, "Invalid line number entered");
                 else { 
                     deleteLine(fname, atoi(fdelindex));
                     fprintf(chlogp, "Line %s deleted from file %s\n", fdelindex, fname);
@@ -526,8 +658,20 @@ int main(int argc, char** argv) {
                 break;
 
             case 12: //show number of lines
-                printf("%i\n", countFileLines("test.txt"));
+                //printf("%i\n", countFileLines("test.txt"));
                 fname = getInput(inputwin, inputwinborder, "Enter a file to count the lines of:");
+
+                //if filename invalid
+                if (checkFileName(fname) == 1) {
+                    outputToWin(displaywin, "Invalid name entered");
+                    break;
+                
+                //if file doesn't exist
+                } else if (checkFileName(fname) == 0) {
+                    outputToWin(displaywin, "File does not exist, or is unreadable");
+                    break;
+                }
+
                 char linesNum[255];
                 sprintf(linesNum, "%d", countFileLines(fname));
                 outputToWin(displaywin, linesNum);
@@ -537,15 +681,47 @@ int main(int argc, char** argv) {
 
             case 13: //find
                 fname = getInput(inputwin, inputwinborder, "Enter a file to search in:");
+                
+                //if filename invalid
+                if (checkFileName(fname) == 1) {
+                    outputToWin(displaywin, "Invalid name entered");
+                    break;
+                
+                //if file doesn't exist
+                } else if (checkFileName(fname) == 0) {
+                    outputToWin(displaywin, "File does not exist, or is unreadable");
+                    break;
+                }
+
                 char* searchString = getInput(inputwin, inputwinborder, "Enter a string to search:");
+                if (strcmp(searchString, "") == 0) {
+                    outputToWin(displaywin, "Invalid search string entered");
+                    break;
+                }
                 find(searchString, fname, displaywin);
+                fprintf(chlogp, "File %s searched for %s\n", fname, searchString);
+                logNumOfLines(chlogp, fname);
                 break;
 
             case 14: //replace
                 fname = getInput(inputwin, inputwinborder, "Enter a file to replace in:");
+
+                //if filename invalid
+                if (checkFileName(fname) == 1) {
+                    outputToWin(displaywin, "Invalid name entered");
+                    break;
+                
+                //if file doesn't exist
+                } else if (checkFileName(fname) == 0) {
+                    outputToWin(displaywin, "File does not exist, or is unreadable");
+                    break;
+                }
+
                 char* findString = getInput(inputwin, inputwinborder, "Enter a string to replace:");
                 char* replString = getInput(inputwin, inputwinborder, "Enter a string to replace with:");
                 replace(findString, replString, fname, displaywin);
+                fprintf(chlogp, "%s replaced with %s in file %s\n",findString, replString, fname);
+                logNumOfLines(chlogp, fname);
                 break;
 
             case 15: //exit
@@ -553,8 +729,7 @@ int main(int argc, char** argv) {
                 break;
 
             default:
-                printf("This shouldn't happen!\n");
-                printf("%d\n", highlight);
+                printf("Invalid option chosen\n");
         }
 
         refresh();
@@ -564,7 +739,7 @@ int main(int argc, char** argv) {
 
     }
 
-    //getch();
+    //close the program
     endwin();
 
     fclose(chlogp);
